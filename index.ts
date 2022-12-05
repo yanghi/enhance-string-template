@@ -22,8 +22,15 @@ interface Block {
     [x: string]: any
 }
 
+interface EnhanceBlock extends Block {
+    /**
+     * A list of plugin names used to convert block values
+     */
+    hits: string[]
+}
 
 type BlockTransform = (block: Block) => void
+type EnhanceBlockTransform = (block: EnhanceBlock) => void
 
 export interface CompileOptions {
     pairs?: {
@@ -262,7 +269,7 @@ function parseResultWithPlugins(result: OriginalCompileResult, values: ValueProv
                 const hit = block.hits[i];
                 let plugin: Plugin | undefined = plugins[hit]
                 if (plugin && plugin.value) {
-                    value = plugin.value(values, block, value)
+                    value = plugin.value(values, block as EnhanceBlock, value)
                 }
             }
         } else {
@@ -335,10 +342,10 @@ export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?
     return enhanceComplier as any
 }
 
-export interface Plugin {
+export interface Plugin<B extends Block = EnhanceBlock> {
     readonly name: string
-    transformBlock?: CompileOptions['transformBlock']
-    value?: (values: ValueProvides, block: Block, prevValue: any) => any
+    transformBlock?: EnhanceBlockTransform | EnhanceBlockTransform[]
+    value?: (values: ValueProvides, block: B, prevValue: any) => any
 }
 
 type Plugins = Record<string, Plugin>
