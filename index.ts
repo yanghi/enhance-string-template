@@ -161,19 +161,21 @@ export function compile(template: string, options: CompileOptions = {}, parser: 
             if (match.match) {
                 let rawValue = template.slice(open.next, match.loc).trim()
 
-                const block: Block = {
-                    loc: {
-                        s: open.loc,
-                        e: match.loc + endBraket.length - 1,
-                        vs: open.loc + startBraket.length,
-                        ve: match.loc - 1
-                    },
-                    name: rawValue,
-                    raw: rawValue
-                }
+                if (rawValue) {
+                    const block: Block = {
+                        loc: {
+                            s: open.loc,
+                            e: match.loc + endBraket.length - 1,
+                            vs: open.loc + startBraket.length,
+                            ve: match.loc - 1
+                        },
+                        name: rawValue,
+                        raw: rawValue
+                    }
 
-                transform(block)
-                blocks.push(block)
+                    transform(block)
+                    blocks.push(block)
+                }
                 open = null
             } else {
                 match = braketMatcher(template, pairs!.start, i)

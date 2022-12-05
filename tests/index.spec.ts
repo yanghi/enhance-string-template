@@ -56,6 +56,11 @@ describe('template', () => {
         expect(var_3.loc.vs).toBe(3)
         expect(var_3.loc.e).toBe(9)
         expect(var_3.loc.ve).toBe(7)
+
+        // empty variable
+        expect(compile('hi<>', {}, false).blocks.length).toBe(0)
+        expect(compile('hi<  >', {}, false).blocks.length).toBe(0)
+
     })
     it('compile/parser', () => {
         let spy_1 = jest.fn((res) => {
