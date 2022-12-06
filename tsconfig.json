@@ -1,13 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "es2015",
-    "module": "CommonJS",
-    "rootDir": ".",
-    "outDir": "dist",
-    "baseUrl": ".",
-    "moduleResolution": "node",
-    "types": ["jest", "node"],
-    "skipLibCheck": true
-  },
+  "extends": "./tsconfig.base.json",
   "include": ["tests"]
 }

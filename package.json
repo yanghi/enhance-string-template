@@ -13,7 +13,7 @@
     "url": "https://github.com/yanghi/enhance-string-template"
   },
   "scripts": {
-    "build": "tsc index --outDir dist -d",
+    "build": "tsc -p tsconfig.base.json",
     "test": "jest"
   },
   "devDependencies": {
