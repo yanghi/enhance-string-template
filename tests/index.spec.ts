@@ -132,6 +132,18 @@ describe('template', () => {
             },
             hash: '1234567'
         })).toBe('..undefined:undefined..')
+
+        let c2 = createEnhanceCompiler([], {
+            pairs: {
+                start: '{',
+                end: '}'
+            }
+        })
+
+        expect(c2('..{key|upper}:{hash:3}..')(values)).not.toBe('..HASH:123..')
+        c2.add([SlicePlugin, 'pipe'])
+        expect(c2('..{key|upper}:{hash:3}..')(values)).toBe('..HASH:123..')
+
     })
     it('customize plugin', () => {
         let MyPlugin: Plugin = {

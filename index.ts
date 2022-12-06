@@ -309,60 +309,22 @@ function bindPluginContext<T extends Function | Function[]>(plugin: Plugin, fn: 
 }
 
 export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?: CompileOptions): EnhanceComplier {
+    let complierIns = new EnhanceCompilerClass(options)
 
+    complierIns.add(plugins ? plugins : Object.keys(GlobalPlugins.plugins))
 
-    const mergedOptions = Object.assign({}, options)
+    var enhanceCompiler = function enhanceCompiler(this: EnhanceCompilerClass, template: string) {
+        let result = this.compile(template)
 
-    var transformBlock: BlockTransform[] = [function init(b) {
-        b.hits = []
-    }]
-
-    const registerdPlugins: Plugins = {}
-
-    if (!plugins) {
-        Object.assign(registerdPlugins, GlobalPlugins.plugins)
-    } else {
-        plugins.forEach(pluginOrName => {
-            let plugin = typeof pluginOrName === 'string' ? GlobalPlugins.plugins[pluginOrName] : pluginOrName
-            if (plugin) {
-                registerdPlugins[plugin.name] = plugin
-            }
-        })
-    }
-    mergedOptions.transformBlock = transformBlock
-    mergeArr(transformBlock, mergedOptions.transformBlock)
-
-        ; (Object.keys(registerdPlugins)).map(k => registerdPlugins[k]).forEach(plugin => {
-            if (!plugin) return
-            mergeArr(transformBlock, bindPluginContext(plugin, plugin.transformBlock))
-        })
-
-    function enhanceComplier(template: string) {
-        let result = compile(template, mergedOptions, false)
-
+        const that = this
         return function enhanceComplierParse(values: ValueProvides) {
-            return parseResultWithPlugins(result, values, enhanceComplier.plugins)
+            return parseResultWithPlugins(result, values, that.plugins)
         }
     }
 
-    enhanceComplier.plugins = registerdPlugins
+    enhanceCompiler = enhanceCompiler.bind(complierIns)
 
-    enhanceComplier.add = function addPlugin(pluginOrName: Plugin | string) {
-        let plugin = typeof pluginOrName === 'string' ? GlobalPlugins.plugins[pluginOrName] : pluginOrName
-        if (plugin) {
-            registerdPlugins[plugin.name] = plugin
-        }
-    }
-
-    enhanceComplier.remove = function removePlugin(plugin: Plugin | string) {
-        const arr = Array.isArray(plugin) ? plugin : [plugin]
-
-        arr.forEach(handler => {
-            delete enhanceComplier.plugins[typeof handler == 'string' ? handler : handler.name]
-        })
-    }
-
-    return enhanceComplier as any
+    return extend(enhanceCompiler, complierIns)
 }
 
 export interface Plugin<B extends Block = EnhanceBlock> {
@@ -374,6 +336,50 @@ export interface Plugin<B extends Block = EnhanceBlock> {
 type Plugins = Record<string, Plugin>
 interface EnhanceComplier extends PluginManager {
     (template: string): Parse
+}
+
+function enhanceBlockInitTransform(block: EnhanceBlock) {
+    block.hits = []
+}
+function extend<T, S>(target: T, source: S): S & T {
+    target['__proto__'] = source
+
+    return target as any
+}
+class EnhanceCompilerClass implements PluginManager {
+    private _options: CompileOptions & { transformBlock: BlockTransform[] }
+
+    constructor(options: CompileOptions = {}) {
+        this._options = Object.assign({}, options, { transformBlock: [enhanceBlockInitTransform] })
+        if (options.transformBlock) {
+            mergeArr(this._options.transformBlock, options.transformBlock)
+        }
+        this.plugins = {}
+    }
+    compile(template: string) {
+        return compile(template, this._options, false)
+    }
+    plugins: Plugins
+    add(pluginArg: PluginArgument): void {
+        let plugins = isArray(pluginArg) ? pluginArg : [pluginArg]
+
+        plugins.forEach(pluginOrName => {
+            let plugin = typeof pluginOrName === 'string' ? GlobalPlugins.plugins[pluginOrName] : pluginOrName
+
+            if (plugin) {
+                this.plugins[plugin.name] = plugin
+                mergeArr(this._options.transformBlock, bindPluginContext(plugin, plugin.transformBlock))
+            }
+        })
+
+    }
+    remove(pluginArg: PluginArgument): void {
+        const arr = Array.isArray(pluginArg) ? pluginArg : [pluginArg]
+
+        arr.forEach(pluginOrName => {
+            delete this.plugins[typeof pluginOrName == 'string' ? pluginOrName : pluginOrName.name]
+        })
+    }
 }
 
 type PluginArgument = string | Plugin | Array<string | Plugin>
@@ -465,9 +471,9 @@ export interface VariableProviderPluginOptions {
  *  prefix: '$'
  * })
  * providerPlugin.provide({userDir: '/usr'})
- * let enhanceComplier = createEnhanceCompiler([providerPlugin])
+ * let enhanceCompiler = createEnhanceCompiler([providerPlugin])
  * // '/root/usr/something'
- * enhanceComplier('<$root><$userDir><other>')({other: '/something'})
+ * enhanceCompiler('<$root><$userDir><other>')({other: '/something'})
  */
 export class VariableProviderPlugin implements Plugin {
     name: string
