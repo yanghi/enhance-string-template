@@ -12,7 +12,7 @@ import parse, { compile, defaultOptions } from "enhance-string-template";
 // '/root/path/to'
 parse("<rootDir>/path/to", { rootDir: "/root" });
 // 'hi jim'
-parse('hi <0>', ['jim'])
+parse("hi <0>", ["jim"]);
 // using the '\\' to escape
 parse("\\<rootDir>/path/to", { rootDir: "/root" });
 // use custom default options
@@ -63,12 +63,23 @@ template({
   upper(s: string) {
     return s.toUpperCase();
   },
-  hash: "1234567"
+  hash: "1234567",
 });
 
 // you can remove the regsitered plugin by remove function
 enhanceCompiler.remove(["pipe", "slice"]);
 ```
+
+**Built-in plugins**
+
+List of plain object plugins
+
+- SlicePlugin
+- PipePlugin
+
+List of class plugins
+
+- VariableProviderPlugin
 
 **Customize Plugin**
 

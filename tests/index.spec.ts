@@ -1,4 +1,4 @@
-import parse, { compile, createEnhanceCompiler, Plugin, PipePlugin, SlicePlugin, GlobalPlugins, defaultOptions } from '../index'
+import parse, { compile, createEnhanceCompiler, Plugin, PipePlugin, SlicePlugin, GlobalPlugins, defaultOptions, VariableProviderPlugin } from '../index'
 
 describe('template', () => {
     it('defaultOptions', () => {
@@ -159,6 +159,48 @@ describe('template', () => {
 
         expect(template({ a: 1, b: 2, c: 3 })).toBe('result: 6')
     })
+})
 
+describe('built-in plugins', () => {
+    it('VariableProviderPlugin', () => {
+        var providerPlugin = new VariableProviderPlugin({
+            name: 'rootVariableProvider',
+            provide: { root: '/root' },
+            prefix: '$'
+        })
+        expect(providerPlugin.name).toBe('rootVariableProvider')
+        let enhanceComplier = createEnhanceCompiler([providerPlugin])
+        providerPlugin.provide({ userDir: '/usr' })
 
+        expect(enhanceComplier('<$root><$userDir>')({ $root: '/custom' })).toBe('/custom/usr')
+        expect(enhanceComplier('<$root><$userDir><other>')({ other: '/something' })).toBe('/root/usr/something')
+
+        let p_2 = new VariableProviderPlugin()
+
+        expect(p_2.name).toBe('var-provider-1')
+
+        // should work well
+        p_2.provide({ a: 1 })
+        expect(p_2.valueProvides['a']).toBe(1)
+        p_2.provide({ b: 2 })
+        expect(p_2.valueProvides['a']).toBe(1)
+        expect(p_2.valueProvides['b']).toBe(2)
+
+        p_2.provide([0])
+        expect(p_2.valueProvides[0]).toBe(0)
+        expect(p_2.valueProvides.length).toBe(1)
+
+        p_2.provide([1])
+        expect(p_2.valueProvides[0]).toBe(0)
+        expect(p_2.valueProvides[1]).toBe(1)
+        expect(p_2.valueProvides.length).toBe(2)
+
+        p_2.provide([2], false)
+        expect(p_2.valueProvides[0]).toBe(2)
+        expect(p_2.valueProvides.length).toBe(1)
+
+        let p_3 = new VariableProviderPlugin()
+        expect(p_3.name).toBe('var-provider-2')
+        expect(createEnhanceCompiler([p_3])('<name>')({ name: 'hi' })).toBe('hi')
+    })
 })

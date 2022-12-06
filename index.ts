@@ -67,6 +67,16 @@ const braketMatcher: BraketMatcher = (template: string, braket: string, loc: num
 }
 
 function noop() { }
+const isArray = Array.isArray
+
+let _id = 0
+function uid() {
+    return ++_id
+}
+const isPlainObject = (arg: any): arg is object => {
+    return arg && typeof arg === 'object' && !isArray(arg)
+}
+
 
 export interface OriginalCompileResult {
     template: string,
@@ -136,9 +146,7 @@ export function compile(template: string, options: CompileOptions = {}, parser: 
     const blocks: Block[] = [],
         startBraket = pairs.start!,
         endBraket = pairs.end!,
-        transform = Array.isArray(transformBlock) ? function batchTrnsform(block) {
-            transformBlock.forEach(transform => transform(block))
-        } : transformBlock
+        transforms = Array.isArray(transformBlock) ? transformBlock : [transformBlock]
 
     let i = 0,
         len = template.length,
@@ -180,7 +188,11 @@ export function compile(template: string, options: CompileOptions = {}, parser: 
                         raw: rawValue
                     }
 
-                    transform(block)
+                    // transform(block)
+                    transforms.forEach(transform => {
+                        transform(block);
+                    })
+
                     blocks.push(block)
                 }
                 open = null
@@ -285,6 +297,17 @@ function parseResultWithPlugins(result: OriginalCompileResult, values: ValueProv
     return resultStr
 }
 
+function bindPluginContext<T extends Function | Function[]>(plugin: Plugin, fn: T) {
+    if (typeof fn === 'function') {
+        return fn.bind(plugin)
+    }
+
+    for (let i = 0; i < fn.length; i++) {
+        fn[i] = fn[i].bind(plugin)
+    }
+    return fn
+}
+
 export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?: CompileOptions): EnhanceComplier {
 
 
@@ -311,7 +334,7 @@ export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?
 
         ; (Object.keys(registerdPlugins)).map(k => registerdPlugins[k]).forEach(plugin => {
             if (!plugin) return
-            mergeArr(transformBlock, plugin.transformBlock)
+            mergeArr(transformBlock, bindPluginContext(plugin, plugin.transformBlock))
         })
 
     function enhanceComplier(template: string) {
@@ -417,5 +440,80 @@ export const SlicePlugin: Plugin = {
     value: function sliceValue(values, block) {
         var value: string = values[block.sliceName] || ''
         return value.slice(0, block.slice)
+    }
+}
+
+export interface VariableProviderPluginOptions {
+    /**
+     * plugin name
+     */
+    name?: string
+    provide?: ValueProvides
+    /**
+     * If given, all template variable names need to be prefixed with prefix string to use the variable values provided by VariableProviderPlugin.
+     * for example, prefix is '$', the template `<$myVaribale>`
+     */
+    prefix?: string
+}
+
+/**
+ * @example
+ * 
+ * var providerPlugin = new VariableProviderPlugin({
+ *  name: 'rootVariableProvider',
+ *  provide: {root: '/root'},
+ *  prefix: '$'
+ * })
+ * providerPlugin.provide({userDir: '/usr'})
+ * let enhanceComplier = createEnhanceCompiler([providerPlugin])
+ * // '/root/usr/something'
+ * enhanceComplier('<$root><$userDir><other>')({other: '/something'})
+ */
+export class VariableProviderPlugin implements Plugin {
+    name: string
+    private _options: VariableProviderPluginOptions
+    private _provides: ValueProvides
+    constructor(options: VariableProviderPluginOptions = {}) {
+        this.name = options.name || 'var-provider-' + uid()
+        this._options = options
+        this._provides = options.provide || {}
+    }
+    get valueProvides() {
+        return this._provides
+    }
+    provide(values: ValueProvides, merge: boolean = true) {
+        let before = this._provides
+        if (merge) {
+            // only merge the two object both same type
+            if (this._provides == undefined || !((isArray(before) && isArray(values)) || (isPlainObject(before) && isPlainObject(values)))) {
+                merge = false
+            }
+        }
+
+        if (merge) {
+            if (isArray(values)) {
+                this._provides = this._provides.concat(values)
+            } else {
+                Object.assign(this._provides, values)
+            }
+        } else {
+            this._provides = values
+        }
+    }
+    transformBlock(block: EnhanceBlock) {
+        let key = block.name
+        if (this._options.prefix) {
+            key = key.slice(this._options.prefix.length)
+        }
+        if (key in this._provides) {
+            block.hits.push(this.name)
+            block._vpKey = key
+        }
+    }
+    value(vs: ValueProvides, block: EnhanceBlock) {
+        if (block.name in vs) {
+            return vs[block.name]
+        }
+        return this._provides[block._vpKey]
     }
 }
