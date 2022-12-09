@@ -523,3 +523,36 @@ export class VariableProviderPlugin implements Plugin {
         return this._provides[block._vpKey]
     }
 }
+
+export const hasProp = (obj: any, prop: string) => {
+    return prop in obj
+}
+export const isObject = (o: any): o is Record<any, any> => {
+    return typeof o == 'object' && o
+}
+export function getProp<T = Record<any, any>>(obj: T, prop: string | Array<keyof T>) {
+    let keys = typeof prop == 'string' ? prop.split('.') : prop
+    let cur: any = obj
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i]
+        if (!isObject(cur) || !hasProp(cur, key as string)) return undefined
+        cur = cur[key as string]
+    }
+    return cur
+}
+
+
+export const DotPropPlugin: Plugin = {
+    name: 'dot-prop',
+    transformBlock: function dotPropTransform(block) {
+        let dotKeys = block.raw.split('.')
+
+        if (dotKeys.length > 1) {
+            block.hits.push('dot-prop')
+            block._dotProps = dotKeys
+        }
+    },
+    value(values, block) {
+        return getProp(values, block._dotProps)
+    }
+}

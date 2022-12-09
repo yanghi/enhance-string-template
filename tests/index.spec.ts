@@ -1,3 +1,4 @@
+import { DotPropPlugin } from './../index';
 import parse, { compile, createEnhanceCompiler, Plugin, PipePlugin, SlicePlugin, GlobalPlugins, defaultOptions, VariableProviderPlugin } from '../index'
 
 describe('template', () => {
@@ -215,4 +216,11 @@ describe('built-in plugins', () => {
         expect(p_3.name).toBe('var-provider-2')
         expect(createEnhanceCompiler([p_3])('<name>')({ name: 'hi' })).toBe('hi')
     })
+    it('DotPropPlugin', () => {
+        let complier = createEnhanceCompiler([DotPropPlugin])
+
+        expect(complier('<a.b.c>')({ a: { b: { c: 'hi' } } })).toBe('hi')
+        expect(complier('<f.c>')({})).toBe('undefined')
+    })
+
 })

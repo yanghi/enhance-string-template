@@ -76,6 +76,7 @@ List of plain object plugins
 
 - SlicePlugin
 - PipePlugin
+- DotPropPlugin
 
 List of class plugins
 
