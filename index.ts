@@ -266,37 +266,6 @@ function mergeArr<T>(target: T[], source: T | T[] | undefined) {
     return target
 }
 
-function parseResultWithPlugins(result: OriginalCompileResult, values: ValueProvides, plugins: Plugins) {
-    if (!result.blocks.length) return result.template
-
-    let resultStr = ''
-    let bi = 0
-
-    for (let i = 0; i < result.blocks.length; i++) {
-        const block = result.blocks[i];
-        var value
-
-        if (block.hits.length) {
-            for (let i = 0; i < block.hits.length; i++) {
-                const hit = block.hits[i];
-                let plugin: Plugin | undefined = plugins[hit]
-                if (plugin && plugin.value) {
-                    value = plugin.value(values, block as EnhanceBlock, value)
-                }
-            }
-        } else {
-            value = values[block.name]
-        }
-
-        resultStr += (result.template.slice(bi, block.loc.s) + value)
-        bi = block.loc.e + 1
-    }
-
-    resultStr += result.template.slice(result.blocks[result.blocks.length - 1].loc.e + 1)
-
-    return resultStr
-}
-
 function bindPluginContext<T extends Function | Function[]>(plugin: Plugin, fn: T) {
     if (typeof fn === 'function') {
         return fn.bind(plugin)
@@ -308,7 +277,7 @@ function bindPluginContext<T extends Function | Function[]>(plugin: Plugin, fn: 
     return fn
 }
 
-export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?: CompileOptions): EnhanceComplier {
+export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?: Partial<EnhanceCompilerOptions>): EnhanceComplier {
     let complierIns = new EnhanceCompilerClass(options)
 
     complierIns.add(plugins ? plugins : Object.keys(GlobalPlugins.plugins))
@@ -318,7 +287,7 @@ export function createEnhanceCompiler(plugins?: Array<Plugin | string>, options?
 
         const that = this
         return function enhanceComplierParse(values: ValueProvides) {
-            return parseResultWithPlugins(result, values, that.plugins)
+            return that.parseResult(result, values)
         }
     }
 
@@ -346,8 +315,32 @@ function extend<T, S>(target: T, source: S): S & T {
 
     return target as any
 }
+interface EnhanceCompilerOptions extends CompileOptions {
+    transformBlock: BlockTransform[]
+    /**
+     * log
+     * @default true
+     */
+    noise?: boolean
+}
+function typeOf(obj: any) {
+    if (obj === null) return 'null'
+    return typeof obj
+}
+function validateValue(template: string, block: Block, values: ValueProvides, value: any) {
+    if (value == null) {
+        console.error(
+            `complie parse value error,"${template.slice(block.loc.s, block.loc.e + 1)}" block got ${typeOf(value)}\n`
+            + (block.hits && block.hits.length ? `use plugins ${block.hits.join(',')}\n` : '')
+            + `use value provider ${JSON.stringify(values)}\n`
+            + `at postion ${block.loc.s}-${block.loc.e}\nat template "${template}"`
+        )
+        return false
+    }
+    return true
+}
 class EnhanceCompilerClass implements PluginManager {
-    private _options: CompileOptions & { transformBlock: BlockTransform[] }
+    private _options: EnhanceCompilerOptions
 
     constructor(options: CompileOptions = {}) {
         this._options = Object.assign({}, options, { transformBlock: [enhanceBlockInitTransform] })
@@ -360,6 +353,40 @@ class EnhanceCompilerClass implements PluginManager {
         return compile(template, this._options, false)
     }
     plugins: Plugins
+    parseResult(result: OriginalCompileResult, values: ValueProvides) {
+        if (!result.blocks.length) return result.template
+
+        let resultStr = ''
+        let bi = 0
+
+        for (let i = 0; i < result.blocks.length; i++) {
+            const block = result.blocks[i];
+            var value
+
+            if (block.hits.length) {
+                for (let i = 0; i < block.hits.length; i++) {
+                    const hit = block.hits[i];
+                    let plugin: Plugin | undefined = this.plugins[hit]
+                    if (plugin && plugin.value) {
+                        value = plugin.value(values, block as EnhanceBlock, value)
+                    }
+                }
+            } else {
+                value = values[block.name]
+            }
+
+            if (process.env.NODE_ENV !== 'production' && this._options.noise !== false) {
+                validateValue(result.template, block, values, value)
+            }
+
+            resultStr += (result.template.slice(bi, block.loc.s) + value)
+            bi = block.loc.e + 1
+        }
+
+        resultStr += result.template.slice(result.blocks[result.blocks.length - 1].loc.e + 1)
+
+        return resultStr
+    }
     add(pluginArg: PluginArgument): void {
         let plugins = isArray(pluginArg) ? pluginArg : [pluginArg]
 
