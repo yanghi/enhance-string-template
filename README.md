@@ -1,6 +1,6 @@
 # enhance-string-template
 
-enhanced string template parser
+enhanced string template parser,allow customized plugin to process template.
 
 ## Usage
 
